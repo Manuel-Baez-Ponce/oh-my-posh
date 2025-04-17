@@ -13,10 +13,10 @@ func TestLua(t *testing.T) {
 		Case           string
 		ExpectedString string
 		Version        string
-		HasLua         bool
-		HasLuaJit      bool
 		Prefer         string
 		ExpectedURL    string
+		HasLua         bool
+		HasLuaJit      bool
 	}{
 		{
 			Case:           "Lua 5.4.4 - Prefer Lua",
@@ -78,7 +78,7 @@ func TestLua(t *testing.T) {
 		failMsg := fmt.Sprintf("Failed in case: %s", tc.Case)
 		assert.True(t, l.Enabled(), failMsg)
 		assert.Equal(t, tc.ExpectedString, renderTemplate(env, l.Template(), l), failMsg)
-		assert.Equal(t, tc.ExpectedURL, l.version.URL, failMsg)
-		assert.Equal(t, strings.ToLower(strings.Split(tc.Case, " ")[0]), l.version.Executable, failMsg)
+		assert.Equal(t, tc.ExpectedURL, l.URL, failMsg)
+		assert.Equal(t, strings.ToLower(strings.Split(tc.Case, " ")[0]), l.Executable, failMsg)
 	}
 }

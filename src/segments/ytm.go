@@ -3,13 +3,11 @@ package segments
 import (
 	"encoding/json"
 
-	"github.com/jandedobbeleer/oh-my-posh/src/platform"
 	"github.com/jandedobbeleer/oh-my-posh/src/properties"
 )
 
 type Ytm struct {
-	props properties.Properties
-	env   platform.Environment
+	base
 
 	MusicPlayer
 }
@@ -30,25 +28,20 @@ func (y *Ytm) Enabled() bool {
 	return err == nil
 }
 
-func (y *Ytm) Init(props properties.Properties, env platform.Environment) {
-	y.props = props
-	y.env = env
-}
-
 type ytmdaStatusResponse struct {
-	player `json:"player"`
 	track  `json:"track"`
+	player `json:"player"`
 }
 
 type player struct {
-	HasSong                     bool    `json:"hasSong"`
-	IsPaused                    bool    `json:"isPaused"`
-	VolumePercent               int     `json:"volumePercent"`
-	SeekbarCurrentPosition      int     `json:"seekbarCurrentPosition"`
 	SeekbarCurrentPositionHuman string  `json:"seekbarCurrentPositionHuman"`
-	StatePercent                float64 `json:"statePercent"`
 	LikeStatus                  string  `json:"likeStatus"`
 	RepeatType                  string  `json:"repeatType"`
+	VolumePercent               int     `json:"volumePercent"`
+	SeekbarCurrentPosition      int     `json:"seekbarCurrentPosition"`
+	StatePercent                float64 `json:"statePercent"`
+	HasSong                     bool    `json:"hasSong"`
+	IsPaused                    bool    `json:"isPaused"`
 }
 
 type track struct {
@@ -56,10 +49,10 @@ type track struct {
 	Title           string `json:"title"`
 	Album           string `json:"album"`
 	Cover           string `json:"cover"`
-	Duration        int    `json:"duration"`
 	DurationHuman   string `json:"durationHuman"`
 	URL             string `json:"url"`
 	ID              string `json:"id"`
+	Duration        int    `json:"duration"`
 	IsVideo         bool   `json:"isVideo"`
 	IsAdvertisement bool   `json:"isAdvertisement"`
 	InLibrary       bool   `json:"inLibrary"`
@@ -80,14 +73,14 @@ func (y *Ytm) setStatus() error {
 	}
 	y.Status = playing
 	y.Icon = y.props.GetString(PlayingIcon, "\uE602 ")
-	if !q.player.HasSong {
+	if !q.HasSong {
 		y.Status = stopped
 		y.Icon = y.props.GetString(StoppedIcon, "\uF04D ")
-	} else if q.player.IsPaused {
+	} else if q.IsPaused {
 		y.Status = paused
 		y.Icon = y.props.GetString(PausedIcon, "\uF8E3 ")
 	}
-	y.Artist = q.track.Author
-	y.Track = q.track.Title
+	y.Artist = q.Author
+	y.Track = q.Title
 	return nil
 }

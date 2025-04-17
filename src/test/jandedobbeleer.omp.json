@@ -38,7 +38,6 @@
           "leading_diamond": "\ue0b6",
           "powerline_symbol": "\ue0b0",
           "properties": {
-            "branch_max_length": 25,
             "fetch_stash_count": true,
             "fetch_status": true,
             "fetch_upstream_icon": true
@@ -223,5 +222,5 @@
   ],
   "console_title_template": "{{ .Shell }} in {{ .Folder }}",
   "final_space": true,
-  "version": 2
+  "version": 3
 }

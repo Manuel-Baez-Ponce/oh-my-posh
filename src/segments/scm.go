@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jandedobbeleer/oh-my-posh/src/platform"
 	"github.com/jandedobbeleer/oh-my-posh/src/properties"
+	"github.com/jandedobbeleer/oh-my-posh/src/runtime"
+	"github.com/jandedobbeleer/oh-my-posh/src/template"
 )
 
 const (
@@ -17,6 +18,7 @@ const (
 
 // ScmStatus represents part of the status of a repository
 type ScmStatus struct {
+	Formats    map[string]string
 	Unmerged   int
 	Deleted    int
 	Added      int
@@ -27,8 +29,6 @@ type ScmStatus struct {
 	Clean      int
 	Missing    int
 	Ignored    int
-
-	Formats map[string]string
 }
 
 func (s *ScmStatus) Changed() bool {
@@ -80,58 +80,57 @@ func (s *ScmStatus) String() string {
 }
 
 type scm struct {
-	props properties.Properties
-	env   platform.Environment
+	base
 
+	Dir             string
+	RepoName        string
+	mainSCMDir      string
+	scmDir          string
+	repoRootDir     string
+	command         string
 	IsWslSharedPath bool
 	CommandMissing  bool
-	Dir             string // actual repo root directory
-	RepoName        string
-
-	workingDir     string
-	rootDir        string
-	realDir        string // real directory (can be different from current path when in worktrees)
-	command        string
-	nativeFallback bool
+	nativeFallback  bool
 }
 
 const (
-	// BranchMaxLength truncates the length of the branch name
-	BranchMaxLength properties.Property = "branch_max_length"
-	// TruncateSymbol appends the set symbol to a truncated branch name
-	TruncateSymbol properties.Property = "truncate_symbol"
-	// FullBranchPath displays the full path of a branch
-	FullBranchPath properties.Property = "full_branch_path"
+	// BranchTemplate allows to specify a template for the branch name
+	BranchTemplate properties.Property = "branch_template"
 )
 
-func (s *scm) Init(props properties.Properties, env platform.Environment) {
-	s.props = props
-	s.env = env
-}
+func (s *scm) formatBranch(branch string) string {
+	mappedBranches := s.props.GetKeyValueMap(MappedBranches, make(map[string]string))
+	for key, value := range mappedBranches {
+		matchSubFolders := strings.HasSuffix(key, "*")
 
-func (s *scm) truncateBranch(branch string) string {
-	fullBranchPath := s.props.GetBool(FullBranchPath, true)
-	maxLength := s.props.GetInt(BranchMaxLength, 0)
+		if matchSubFolders && len(key) > 1 {
+			key = key[0 : len(key)-1] // remove trailing /* or \*
+		}
 
-	if !fullBranchPath && strings.Contains(branch, "/") {
-		index := strings.LastIndex(branch, "/")
-		branch = branch[index+1:]
+		if !strings.HasPrefix(branch, key) {
+			continue
+		}
+
+		branch = strings.Replace(branch, key, value, 1)
+		break
 	}
 
-	if maxLength == 0 || len(branch) <= maxLength {
+	branchTemplate := s.props.GetString(BranchTemplate, "")
+	if len(branchTemplate) == 0 {
 		return branch
 	}
 
-	symbol := s.props.GetString(TruncateSymbol, "")
-	return branch[0:maxLength] + symbol
-}
-
-func (s *scm) shouldIgnoreRootRepository(rootDir string) bool {
-	excludedFolders := s.props.GetStringArray(properties.ExcludeFolders, []string{})
-	if len(excludedFolders) == 0 {
-		return false
+	tmpl := &template.Text{
+		Template: branchTemplate,
+		Context:  struct{ Branch string }{Branch: branch},
 	}
-	return s.env.DirMatchesOneOf(rootDir, excludedFolders)
+
+	text, err := tmpl.Render()
+	if err != nil {
+		return branch
+	}
+
+	return text
 }
 
 func (s *scm) FileContents(folder, file string) string {
@@ -140,7 +139,7 @@ func (s *scm) FileContents(folder, file string) string {
 
 func (s *scm) convertToWindowsPath(path string) string {
 	// only convert when in Windows, or when in a WSL shared folder and not using the native fallback
-	if s.env.GOOS() == platform.WINDOWS || (s.IsWslSharedPath && !s.nativeFallback) {
+	if s.env.GOOS() == runtime.WINDOWS || (s.IsWslSharedPath && !s.nativeFallback) {
 		return s.env.ConvertToWindowsPath(path)
 	}
 
@@ -163,7 +162,7 @@ func (s *scm) hasCommand(command string) bool {
 	// when in a WSL shared folder, we must use command.exe and convert paths accordingly
 	// for worktrees, stashes, and path to work, except when native_fallback is set
 	s.IsWslSharedPath = s.env.InWSLSharedDrive()
-	if s.env.GOOS() == platform.WINDOWS || s.IsWslSharedPath {
+	if s.env.GOOS() == runtime.WINDOWS || s.IsWslSharedPath {
 		command += ".exe"
 	}
 

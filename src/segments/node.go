@@ -4,23 +4,25 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jandedobbeleer/oh-my-posh/src/platform"
 	"github.com/jandedobbeleer/oh-my-posh/src/properties"
 	"github.com/jandedobbeleer/oh-my-posh/src/regex"
 )
 
 type Node struct {
-	language
-
 	PackageManagerIcon string
+	PackageManagerName string
+
+	language
 }
 
 const (
+	// PnpmIcon illustrates PNPM is used
+	PnpmIcon properties.Property = "pnpm_icon"
 	// YarnIcon illustrates Yarn is used
 	YarnIcon properties.Property = "yarn_icon"
 	// NPMIcon illustrates NPM is used
 	NPMIcon properties.Property = "npm_icon"
-	// FetchPackageManager shows if NPM or Yarn is used
+	// FetchPackageManager shows if NPM, PNPM, or Yarn is used
 	FetchPackageManager properties.Property = "fetch_package_manager"
 )
 
@@ -28,43 +30,47 @@ func (n *Node) Template() string {
 	return " {{ if .PackageManagerIcon }}{{ .PackageManagerIcon }} {{ end }}{{ .Full }} "
 }
 
-func (n *Node) Init(props properties.Properties, env platform.Environment) {
-	n.language = language{
-		env:        env,
-		props:      props,
-		extensions: []string{"*.js", "*.ts", "package.json", ".nvmrc", "pnpm-workspace.yaml", ".pnpmfile.cjs", ".npmrc", ".vue"},
-		commands: []*cmd{
-			{
-				executable: "node",
-				args:       []string{"--version"},
-				regex:      `(?:v(?P<version>((?P<major>[0-9]+).(?P<minor>[0-9]+).(?P<patch>[0-9]+))))`,
-			},
-		},
-		versionURLTemplate: "https://github.com/nodejs/node/blob/master/doc/changelogs/CHANGELOG_V{{ .Major }}.md#{{ .Full }}",
-		matchesVersionFile: n.matchesVersionFile,
-		loadContext:        n.loadContext,
-	}
-}
-
 func (n *Node) Enabled() bool {
+	n.extensions = []string{"*.js", "*.ts", "package.json", ".nvmrc", "pnpm-workspace.yaml", ".pnpmfile.cjs", ".vue"}
+	n.commands = []*cmd{
+		{
+			executable: "node",
+			args:       []string{"--version"},
+			regex:      `(?:v(?P<version>((?P<major>[0-9]+).(?P<minor>[0-9]+).(?P<patch>[0-9]+))))`,
+		},
+	}
+	n.versionURLTemplate = "https://github.com/nodejs/node/blob/master/doc/changelogs/CHANGELOG_V{{ .Major }}.md#{{ .Full }}"
+	n.language.matchesVersionFile = n.matchesVersionFile
+	n.language.loadContext = n.loadContext
+
 	return n.language.Enabled()
 }
 
 func (n *Node) loadContext() {
-	if !n.language.props.GetBool(FetchPackageManager, false) {
+	if !n.props.GetBool(FetchPackageManager, false) {
 		return
 	}
-	if n.language.env.HasFiles("yarn.lock") {
-		n.PackageManagerIcon = n.language.props.GetString(YarnIcon, "\U000F011B")
+
+	if n.env.HasFiles("pnpm-lock.yaml") {
+		n.PackageManagerName = "pnpm"
+		n.PackageManagerIcon = n.props.GetString(PnpmIcon, "\U000F02C1")
 		return
 	}
-	if n.language.env.HasFiles("package-lock.json") || n.language.env.HasFiles("package.json") {
-		n.PackageManagerIcon = n.language.props.GetString(NPMIcon, "\uE71E")
+
+	if n.env.HasFiles("yarn.lock") {
+		n.PackageManagerName = "yarn"
+		n.PackageManagerIcon = n.props.GetString(YarnIcon, "\U000F011B")
+		return
+	}
+
+	if n.env.HasFiles("package-lock.json") || n.env.HasFiles("package.json") {
+		n.PackageManagerName = "npm"
+		n.PackageManagerIcon = n.props.GetString(NPMIcon, "\uE71E")
 	}
 }
 
 func (n *Node) matchesVersionFile() (string, bool) {
-	fileVersion := n.language.env.FileContent(".nvmrc")
+	fileVersion := n.env.FileContent(".nvmrc")
 	if len(fileVersion) == 0 {
 		return "", true
 	}
@@ -88,19 +94,19 @@ func (n *Node) matchesVersionFile() (string, bool) {
 		case "fermium":
 			fileVersion = "14.21.3"
 		case "gallium":
-			fileVersion = "16.20.1"
+			fileVersion = "16.20.2"
 		case "hydrogen":
-			fileVersion = "18.19.0"
+			fileVersion = "18.20.3"
 		case "iron":
-			fileVersion = "20.10.0"
+			fileVersion = "20.14.0"
 		}
 	}
 
 	re := fmt.Sprintf(
 		`(?im)^v?%s(\.?%s)?(\.?%s)?$`,
-		n.language.version.Major,
-		n.language.version.Minor,
-		n.language.version.Patch,
+		n.Major,
+		n.Minor,
+		n.Patch,
 	)
 
 	version := strings.TrimSpace(fileVersion)

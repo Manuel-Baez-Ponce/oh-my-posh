@@ -3,11 +3,7 @@ package template
 import (
 	"testing"
 
-	"github.com/jandedobbeleer/oh-my-posh/src/mock"
-	"github.com/jandedobbeleer/oh-my-posh/src/platform"
-
 	"github.com/stretchr/testify/assert"
-	mock2 "github.com/stretchr/testify/mock"
 )
 
 func TestTrunc(t *testing.T) {
@@ -25,24 +21,88 @@ func TestTrunc(t *testing.T) {
 		{Case: "negative", Expected: "ld", Template: `{{ trunc -2 "Hello World" }}`},
 	}
 
-	env := &mock.MockedEnvironment{}
-	env.On("TemplateCache").Return(&platform.TemplateCache{
-		Env: make(map[string]string),
-	})
-	env.On("Error", mock2.Anything)
-	env.On("Debug", mock2.Anything)
-	env.On("DebugF", mock2.Anything, mock2.Anything).Return(nil)
 	for _, tc := range cases {
 		tmpl := &Text{
 			Template: tc.Template,
 			Context:  nil,
-			Env:      env,
 		}
+
 		text, err := tmpl.Render()
 		if tc.ShouldError {
 			assert.Error(t, err)
 			continue
 		}
+
 		assert.Equal(t, tc.Expected, text, tc.Case)
+	}
+}
+
+func TestTruncE(t *testing.T) {
+	cases := []struct {
+		name      string
+		length    any
+		input     string
+		expected  string
+		wantPanic bool
+	}{
+		{
+			name:     "normal truncation",
+			length:   5,
+			input:    "hello world",
+			expected: "hell…",
+		},
+		{
+			name:     "no truncation needed",
+			length:   20,
+			input:    "short",
+			expected: "short",
+		},
+		{
+			name:     "negative length",
+			length:   -3,
+			input:    "hello world",
+			expected: "…ld",
+		},
+		{
+			name:     "zero length",
+			length:   0,
+			input:    "hello",
+			expected: "…",
+		},
+		{
+			name:     "unicode characters",
+			length:   4,
+			input:    "你好世界",
+			expected: "你好世…",
+		},
+		{
+			name:     "empty string",
+			length:   5,
+			input:    "",
+			expected: "",
+		},
+		{
+			name:      "invalid length type",
+			length:    "invalid",
+			input:     "hello",
+			wantPanic: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.wantPanic {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Error("expected panic but got none")
+					}
+				}()
+			}
+
+			result := truncE(tc.length, tc.input)
+			if result != tc.expected {
+				t.Errorf("expected %q but got %q", tc.expected, result)
+			}
+		})
 	}
 }

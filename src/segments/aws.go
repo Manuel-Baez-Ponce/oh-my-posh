@@ -4,13 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jandedobbeleer/oh-my-posh/src/platform"
 	"github.com/jandedobbeleer/oh-my-posh/src/properties"
 )
 
 type Aws struct {
-	props properties.Properties
-	env   platform.Environment
+	base
 
 	Profile string
 	Region  string
@@ -22,11 +20,6 @@ const (
 
 func (a *Aws) Template() string {
 	return " {{ .Profile }}{{ if .Region }}@{{ .Region }}{{ end }} "
-}
-
-func (a *Aws) Init(props properties.Properties, env platform.Environment) {
-	a.props = props
-	a.env = env
 }
 
 func (a *Aws) Enabled() bool {
@@ -69,9 +62,9 @@ func (a *Aws) getConfigFileInfo() {
 	if a.Profile != "" {
 		configSection = fmt.Sprintf("[profile %s]", a.Profile)
 	}
-	configLines := strings.Split(config, "\n")
+	configLines := strings.SplitSeq(config, "\n")
 	var sectionActive bool
-	for _, line := range configLines {
+	for line := range configLines {
 		if strings.HasPrefix(line, configSection) {
 			sectionActive = true
 			continue
